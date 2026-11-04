@@ -237,7 +237,9 @@ static __typeof__(mod) batch_mod[NPART];
 #if MELODEE_DUAL_CORE
 static uint8_t batch_posted[NPART];
 #endif
-static int16_t batch_params[NPART][P_COUNT];
+/* Only matrix destinations change during mod_begin. Snapshot those values,
+ * rather than copying every track parameter on every 32-sample block. */
+static int16_t batch_params[NPART][NMSLOT];
 static __attribute__((noinline)) void mix_prepare_batch(uint32_t n,uint32_t nt)   /* nt: the tracks in use */
 {
     audio_batch_active=1;
@@ -254,7 +256,8 @@ static __attribute__((noinline)) void mix_prepare_batch(uint32_t n,uint32_t nt) 
     for(uint32_t p=0;p<nt;p++){
         track_t *t=&trk[p];
         if(t->engine==ENGI_MIDI){batch_rendered[p]=0;continue;}
-        mod_begin(t);batch_mod[p]=mod;memcpy(batch_params[p],t->p,sizeof t->p);
+        mod_begin(t);batch_mod[p]=mod;
+        if(mod.on)for(uint32_t k=0;k<mod.nk;k++)batch_params[p][k]=t->p[mod.kid[k]];
         spread_on=t->p[P_SPRD]>0 && (trk_vmode(t)==V_POLY || trk_vmode(t)==V_UNISON);
         batch_spread_on[p]=spread_on;spread_buf=batch_spread[p];
         batch_rendered[p]=track_render_audio(t,batch_pcm[p],n,0);
@@ -279,7 +282,7 @@ static __attribute__((noinline)) void mix_part(track_t *t,uint32_t n)
     if(batch_ready){
         uint32_t p=(uint32_t)(t-trk);mod=batch_mod[p];
         part_buf=batch_pcm[p];
-        if(mod.on)for(uint32_t k=0;k<mod.nk;k++)t->p[mod.kid[k]]=batch_params[p][mod.kid[k]];
+        if(mod.on)for(uint32_t k=0;k<mod.nk;k++)t->p[mod.kid[k]]=batch_params[p][k];
         spread_on=batch_spread_on[p];spread_buf=batch_spread[p];rendered=(int)batch_rendered[p];
         if(rendered){
             if(spread_on)spread_sum(part_buf);

@@ -66,7 +66,9 @@ static void audio_batch_worker(void *context)
     if(!n || n>CTL || id>=AP_COUNT || j->guard!=((uint32_t)(uintptr_t)run^n^id^0x913ab267u)){
         AB_STORE(&audio_batch_invalid,1u);return;
     }
-    for(uint32_t i=0;i<n;i++)j->pcm[i]=0;
+    /* State-only jobs have no output. Their kernels never read PCM, so
+     * avoid clearing and later summing a dummy block of zeros. */
+    if(j->out)for(uint32_t i=0;i<n;i++)j->pcm[i]=0;
     AP_START(start);run(j->data,j->pcm);
 #if MELODEE_AUDIO_PROFILE
     j->elapsed=AUDIO_PROFILE_TICKS()-start;
@@ -77,6 +79,7 @@ static void audio_batch_merge(audio_batch_job_t *j)
 #if MELODEE_AUDIO_PROFILE
     audio_profile_add(j->profile_id,j->elapsed);
 #endif
+    if(!j->out)return;
     AP_START(merge_start);
     for(uint32_t i=0;i<j->n;i++)j->out[i]+=j->pcm[i];
     AP_END(AP_BATCH_MERGE,merge_start);

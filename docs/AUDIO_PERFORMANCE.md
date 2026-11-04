@@ -1,3 +1,43 @@
+# Four-track overhead investigation (2026-11-03)
+
+A report of lag with four instruments, budget 18 and a displayed 70–75% CPU
+does not by itself identify the overloaded engine. `audio.c` averages render
+time over about 93 ms and subtracts nested TIMER5 service (USB/input). Deadline
+and safety-shedding decisions include that service; consecutive short peaks
+can therefore overload while the displayed average remains below 85%.
+Budget counts weighted sounding voices, including releases. Four tracks can
+consume the entire pool. As documented in BUILDING.md, the increase to 18 was
+validated for allocation continuity, not device CPU headroom for every song.
+
+Two unnecessary costs in the shared batch path have been removed:
+
+- `mix_prepare_batch` saved all 124 track parameters every 32 samples, although
+  `mix_part` only restored matrix destinations. It now saves the zero to four
+  distinct destinations. Four-track snapshot storage drops from 992 to 32
+  bytes; unmodulated tracks copy no parameter values.
+- FM6 ghost jobs advance silent native voice state without producing audio.
+  They previously cleared a 32-sample PCM buffer and added its zeros to a
+  dummy destination. A null output now marks state-only jobs and skips both
+  passes, retaining execution, profiling, scheduling and failure handling.
+
+Validation: GCC 15 host builds with `-O2 -ffp-contract=off`; batch accounting
+tests cover concurrent/serial execution and failed-worker drops. The extended
+1,296-assignment audio matrix exercises four distinct modulation destinations,
+duplicate destinations, disabling modulation, spread, releases and Chorus.
+Both HEAD and the optimized sources produce hash `6f15a4618f96ef3d` with those
+same tests, and each agrees between serial and concurrent rendering. The
+dual-core suite passes 1,536 FM6 and 348 Prophet cases, including complete FM6
+state parity and worker faults. Admission tests pass all 1,296 assignments.
+
+These changes reduce overhead; they do not establish that budget 18 is safe.
+Host timing of sounding mixed tracks did not show a clear improvement. No
+device measurement or target firmware build was available for this investigation.
+To isolate the reported lag, the remaining inputs are the actual firmware
+version, engines/native patches, active effects and FX RATE, and whether the
+symptom is audio breakup, dropped notes, slow controls, or a combination.
+Compare deadline, shedding, per-track allocation-cut and worker-fault counters
+on the same song at budgets 18 and 12–14 using the existing device tools.
+
 # Optional ECHO / REVERB fidelity (2026-10-19)
 
 Settings > FX RATE selects CLASSIC, 22.05k or 44.1k for every ECHO/REVERB insert

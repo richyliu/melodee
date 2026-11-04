@@ -34,12 +34,27 @@ static void matrix_render(const uint32_t cat[4],uint32_t variant,int parallel)
     audio_worker_online=1;serial_render=!parallel;matrix_setup(cat,variant);
     for(uint32_t block=0;block<96u;block++){
         int32_t out[CTL*2];
-        if(block==16u)for(uint32_t p=0;p<4;p++){trk[p].p[P_SPRD]=42;trk[p].p[P_M1SRC]=MS_LFO;trk[p].p[P_M1DST]=MD_CUT;trk[p].p[P_M1AMT]=24;}
+        if(block==16u)for(uint32_t p=0;p<4;p++){
+            trk[p].p[P_SPRD]=42;
+            /* Fill the compact per-track snapshot with four destinations,
+             * including an engine parameter far above the slot indices. */
+            const uint8_t dst[NMSLOT]={MD_PAN,MD_RATE,MD_VIB,MD_E1};
+            for(uint32_t k=0;k<NMSLOT;k++){
+                trk[p].p[P_M1SRC+3u*k]=MS_VEL;
+                trk[p].p[P_M1DST+3u*k]=dst[k];
+                trk[p].p[P_M1AMT+3u*k]=(int16_t)(8u+p+k);
+            }
+        }
         if(block==32u)for(uint32_t p=0;p<4;p++)for(uint32_t k=0;k<2;k++)trk_note_off(&trk[p],cat[p]>=4?(k?38:36):48+p*3+k*7);
         if(block==40u)for(uint32_t p=0;p<4;p++)for(uint32_t k=0;k<2;k++)trk_note_on(&trk[p],cat[p]>=4?(k?38:36):48+p*3+k*7,100);
         if(block==56u){song.g[G_MFXTYPE]=FX_CHORUS;for(uint32_t p=0;p<4;p++)trk[p].p[P_FXSEND]=30;}
         if(block==72u)for(uint32_t p=0;p<4;p++){trk[p].p[P_E1]+=cat[p]==3?0:1;trk[p].p[P_LD_PIT]=4;}
+        if(block==80u)for(uint32_t p=0;p<4;p++)trk[p].p[P_M4DST]=MD_PAN; /* duplicate destination */
+        if(block==88u)for(uint32_t p=0;p<4;p++)for(uint32_t k=0;k<NMSLOT;k++)trk[p].p[P_M1AMT+3u*k]=0;
+        int16_t params[NPART][P_COUNT];
+        for(uint32_t p=0;p<NPART;p++)memcpy(params[p],trk[p].p,sizeof params[p]);
         mix_block(out,CTL);
+        for(uint32_t p=0;p<NPART;p++)assert(!memcmp(params[p],trk[p].p,sizeof params[p]));
         assert(!audio_batch_count && AW_LOAD(&audio_worker.request)==AW_LOAD(&audio_worker.complete));
         assert(!resource_failures && !audio_worker.timeouts && !injected_faults);
         if(block<16u)for(uint32_t p=0;p<4;p++)assert(active_voices(&trk[p])==2);

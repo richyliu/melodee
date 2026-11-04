@@ -71,11 +71,29 @@ static void ghost_cost_split(void)
     audio_batch_flush();for(uint32_t i=0;i<CTL;i++)assert(out[i]==13);
     audio_batch_native_fm6=0;
 }
+static void state_only(const void *data,int32_t *pcm)
+{
+    (void)pcm;advances+=*(const uint32_t *)data;
+}
+static void state_only_jobs(int worker,int success)
+{
+    uint32_t value=7;online=worker;join_ok=success;advances=0;
+    memset(audio_profile,0,sizeof audio_profile);
+    for(uint32_t j=0;j<3;j++){
+        for(uint32_t i=0;i<CTL;i++)audio_batch_jobs[j].pcm[i]=123;
+        audio_batch_push_cost(state_only,&value,sizeof value,0,CTL,AP_FM6_CONTROL,350);
+    }
+    audio_batch_flush();assert(advances==21 && !audio_batch_count && !audio_batch_started);
+    assert(audio_profile[AP_FM6_CONTROL].calls==(worker&&!success?0:3));
+    assert(!audio_profile[AP_BATCH_MERGE].calls);
+    for(uint32_t j=0;j<3;j++)for(uint32_t i=0;i<CTL;i++)assert(audio_batch_jobs[j].pcm[i]==123);
+}
 int main(void)
 {
     scenario(1,1);scenario(0,1);scenario(1,0);
     dense_group();
     ghost_cost_split();
+    state_only_jobs(1,1);state_only_jobs(0,1);state_only_jobs(1,0);
     const uint32_t ids[]={AP_PROPHET,AP_FM6,AP_CZ,AP_SID,AP_808,AP_909};
     for(uint32_t k=0;k<sizeof ids/sizeof ids[0];k++)engine_split(ids[k]);
     int32_t out[CTL]={0};uint32_t value=1;online=join_ok=1;advances=0;

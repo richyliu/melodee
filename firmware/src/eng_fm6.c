@@ -886,7 +886,7 @@ static void fm6_ghost(track_t *t, voice_t *v, fm6_voice_t *s)
 }
 /* A part's inactive native states are disjoint from its sounding voice jobs.
  * Part-wide caches and parameters are fixed before publication, just as for
- * sounding controls. The dummy PCM is always zero and joins in queue order. */
+ * sounding controls. State-only jobs need no PCM clear or merge. */
 typedef struct {
     track_t *track; fm6_part_t *part; uint32_t mask;
     int32_t pb,brightness; uint32_t poly;
@@ -906,8 +906,7 @@ static void fm6_ghosts_dispatch(track_t *t, fm6_part_t *P, uint32_t mask)
     for(uint32_t k=0;k<NVOICE;k++)if((mask>>k)&1u)
         cost+=P->v[k].still && P->pt.ghost_quiet && pb==P->v[k].spb?24u:350u;
     const fm6_ghost_batch_t job={t,P,mask,pb,t->p[P_E2],t->p[P_VOICE]==V_POLY};
-    static int32_t discard[CTL];
-    audio_batch_push_cost(fm6_ghost_batch_kernel,&job,sizeof job,discard,CTL,AP_FM6_CONTROL,cost);
+    audio_batch_push_cost(fm6_ghost_batch_kernel,&job,sizeof job,0,CTL,AP_FM6_CONTROL,cost);
 }
 
 static inline __attribute__((always_inline)) float fm6_output_clip(float x)
