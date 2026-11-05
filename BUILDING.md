@@ -284,6 +284,22 @@ Or, to install your own build from the web installer, make a local copy of the s
 
 ## Local site
 
+For a portable browser installer containing your local development build:
+
+```sh
+./build.sh
+python3 tools/make_dev_installer.py
+```
+
+This creates `build/local/melodee-dev-web-installer.zip`, including firmware,
+the installer, licence texts and instructions. Unzip it on the computer connected
+to the FM-1, run `python3 -m http.server 8000 --bind 127.0.0.1` in the extracted
+folder, and open `http://localhost:8000/webapp/installer/` in Chrome or Edge.
+The installer labels this unpublished local package `0.0.0`; it is not an attested
+release. Back up the FM-1 before installing. `--package PATH` and `--output PATH.zip`
+override the script's input and output. No compiler toolchain is needed on the
+computer doing the flashing; it only needs Python 3 and the browser.
+
 `web/make_site.py` assembles GitHub Pages layout under an output directory:
 
 - `webapp/installer/` — self-contained installer
